@@ -1,0 +1,131 @@
+# VS Code REST Client. Hasło kont z seeda pochodzi z .env (SEED_PASSWORD).
+@base = http://localhost:3000/api
+@password = {{$dotenv SEED_PASSWORD}}
+
+### Logowanie: ADMIN
+# @name admin
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{ "email": "admin@example.com", "password": "{{password}}" }
+
+### Logowanie: USER właściciel (rezerwacje 1, 2, 5)
+# @name anna
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{ "email": "anna.nowak@example.com", "password": "{{password}}" }
+
+### Logowanie: USER obcy (rezerwacje 3, 4)
+# @name marek
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{ "email": "marek.lewandowski@example.com", "password": "{{password}}" }
+
+@adminToken = {{admin.response.body.accessToken}}
+@annaToken = {{anna.response.body.accessToken}}
+@marekToken = {{marek.response.body.accessToken}}
+
+### Rejestracja - 201
+POST {{base}}/auth/register
+Content-Type: application/json
+
+{ "email": "Jan.Kowalski@example.com", "password": "bardzo-dlugie-haslo" }
+
+### Rejestracja z rolą - 400
+POST {{base}}/auth/register
+Content-Type: application/json
+
+{ "email": "haker@example.com", "password": "bardzo-dlugie-haslo", "role": "ADMIN" }
+
+### Zbyt krótkie hasło - 400
+POST {{base}}/auth/register
+Content-Type: application/json
+
+{ "email": "krotkie@example.com", "password": "krotkie" }
+
+### Duplikat innymi literami - 409 EMAIL_TAKEN
+POST {{base}}/auth/register
+Content-Type: application/json
+
+{ "email": "JAN.KOWALSKI@example.com", "password": "bardzo-dlugie-haslo" }
+
+### Dane zalogowanego - 200
+GET {{base}}/auth/me
+Authorization: Bearer {{annaToken}}
+
+### Brak tokenu - 401
+GET {{base}}/rooms
+
+### Zły format nagłówka - 401
+GET {{base}}/rooms
+Authorization: Basic YWRtaW46YWRtaW4=
+
+### USER: budynki - 200
+GET {{base}}/buildings
+Authorization: Bearer {{annaToken}}
+
+### USER: tworzenie budynku - 403
+POST {{base}}/buildings
+Authorization: Bearer {{annaToken}}
+Content-Type: application/json
+
+{ "name": "Budynek C", "address": "ul. Nowa 5, Kraków" }
+
+### ADMIN: tworzenie budynku - 201
+POST {{base}}/buildings
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "name": "Budynek C", "address": "ul. Nowa 5, Kraków" }
+
+### USER: tylko własne rezerwacje
+GET {{base}}/reservations?status=CONFIRMED&sort=-startTime&page=1&limit=10
+Authorization: Bearer {{annaToken}}
+
+### USER: filtr userId - 403
+GET {{base}}/reservations?userId=3
+Authorization: Bearer {{annaToken}}
+
+### ADMIN: filtr userId - 200
+GET {{base}}/reservations?userId=3
+Authorization: Bearer {{adminToken}}
+
+### Właściciel - 200
+GET {{base}}/reservations/2
+Authorization: Bearer {{annaToken}}
+
+### Obcy USER - 404
+GET {{base}}/reservations/2
+Authorization: Bearer {{marekToken}}
+
+### ADMIN - 200
+GET {{base}}/reservations/2
+Authorization: Bearer {{adminToken}}
+
+### Obcy USER nie anuluje - 404
+PATCH {{base}}/reservations/2/cancel
+Authorization: Bearer {{marekToken}}
+
+### Właściciel anuluje - 200
+PATCH {{base}}/reservations/2/cancel
+Authorization: Bearer {{annaToken}}
+
+### ADMIN: rozpoczęta rezerwacja - 409
+PATCH {{base}}/reservations/1/cancel
+Authorization: Bearer {{adminToken}}
+
+### Tworzenie rezerwacji - właściciel z tokenu - 201
+POST {{base}}/reservations
+Authorization: Bearer {{annaToken}}
+Content-Type: application/json
+
+{ "roomId": 3, "participants": 10, "startTime": "2027-01-10T10:00:00Z", "endTime": "2027-01-10T12:00:00Z" }
+
+### userId w body - 400
+POST {{base}}/reservations
+Authorization: Bearer {{annaToken}}
+Content-Type: application/json
+
+{ "roomId": 3, "participants": 10, "userId": 1, "startTime": "2027-01-11T10:00:00Z", "endTime": "2027-01-11T12:00:00Z" }
