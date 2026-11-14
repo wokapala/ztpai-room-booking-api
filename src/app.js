@@ -21,7 +21,7 @@ const { createReservationsRouter } = require("./modules/reservations/reservation
 function createApp({ config, runInTransaction, now }) {
   const app = express();
 
-  app.use(requestLogger);
+  app.use(requestLogger(config.NODE_ENV === "test" ? () => {} : console.log));
   app.use(express.json());
 
   const requireAuth = authenticate(config.JWT_SECRET);
