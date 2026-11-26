@@ -1,4 +1,5 @@
 const { NotFoundError, ConflictError, ValidationError, ForbiddenError } = require("../../errors/AppError");
+const { noopEventBus } = require("../../events/eventBus");
 
 const MIN_DURATION_MS = 15 * 60 * 1000;
 const MAX_DURATION_MS = 8 * 60 * 60 * 1000;
@@ -19,7 +20,7 @@ function assertCanAccess(reservation, currentUser) {
   if (!allowed) throw new NotFoundError("Reservation");
 }
 
-function createReservationsService({ runInTransaction, now = () => new Date() }) {
+function createReservationsService({ runInTransaction, eventBus = noopEventBus, now = () => new Date() }) {
   async function createReservation(input, currentUser) {
     const start = new Date(input.startTime).getTime();
     const end = new Date(input.endTime).getTime();
@@ -41,7 +42,7 @@ function createReservationsService({ runInTransaction, now = () => new Date() })
       ]);
     }
 
-    return runInTransaction(async ({ roomsRepository, reservationsRepository }) => {
+    const reservation = await runInTransaction(async ({ roomsRepository, reservationsRepository }) => {
       const room = await roomsRepository.findById(input.roomId);
       if (!room) throw new NotFoundError("Room");
 
@@ -72,6 +73,16 @@ function createReservationsService({ runInTransaction, now = () => new Date() })
         internalNote: "created via API v2"
       });
     });
+
+    // runInTransaction kończy się dopiero po COMMIT - błąd (np. 409) przerywa funkcję przed publish
+    eventBus.publish("reservation.created", {
+      reservationId: reservation.id,
+      roomId: reservation.roomId,
+      userId: reservation.userId,
+      startTime: new Date(reservation.startTime).toISOString(),
+      endTime: new Date(reservation.endTime).toISOString()
+    });
+    return reservation;
   }
 
   async function getReservation(id, currentUser) {
@@ -99,11 +110,12 @@ function createReservationsService({ runInTransaction, now = () => new Date() })
   }
 
   async function cancelReservation(id, currentUser) {
-    return runInTransaction(async ({ reservationsRepository }) => {
+    let changed = false;
+    const cancelled = await runInTransaction(async ({ reservationsRepository }) => {
       const reservation = await reservationsRepository.findById(id);
       assertCanAccess(reservation, currentUser);
 
-      // ponowne anulowanie - idempotentne, bez zmian
+      // ponowne anulowanie - idempotentne, bez zmian (i bez eventu)
       if (reservation.status === "CANCELLED") return reservation;
 
       if (!ALLOWED_TRANSITIONS[reservation.status].includes("CANCELLED")) {
@@ -116,8 +128,19 @@ function createReservationsService({ runInTransaction, now = () => new Date() })
         throw new ConflictError("Reservation has already started", "RESERVATION_ALREADY_STARTED");
       }
 
+      changed = true;
       return reservationsRepository.update(id, { status: "CANCELLED", cancelledAt: now() });
     });
+
+    if (changed) {
+      eventBus.publish("reservation.cancelled", {
+        reservationId: cancelled.id,
+        roomId: cancelled.roomId,
+        userId: cancelled.userId,
+        cancelledBy: currentUser.id
+      });
+    }
+    return cancelled;
   }
 
   return { createReservation, getReservation, listReservations, cancelReservation };
