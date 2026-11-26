@@ -1,5 +1,7 @@
 # Room Booking API
 
+[![CI](https://github.com/wokapala/ztpai-room-booking-api/actions/workflows/ci.yml/badge.svg)](https://github.com/wokapala/ztpai-room-booking-api/actions/workflows/ci.yml)
+
 REST API do rezerwacji sal: budynki, sale, rezerwacje, użytkownicy z rolami `USER` / `ADMIN`.
 Projekt na przedmiot ZTPAI.
 
