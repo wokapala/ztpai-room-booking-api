@@ -26,7 +26,7 @@ module.exports = {
     description: "Zarządzanie budynkami, salami i rezerwacjami. Token z POST /api/auth/login wklej w Authorize."
   },
   security: [{ bearerAuth: [] }],
-  tags: [{ name: "Auth" }, { name: "Buildings" }, { name: "Rooms" }, { name: "Reservations" }],
+  tags: [{ name: "Auth" }, { name: "Buildings" }, { name: "Rooms" }, { name: "Reservations" }, { name: "Admin" }],
   components: {
     securitySchemes: {
       bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" }
@@ -187,6 +187,32 @@ module.exports = {
           participants: { type: "integer", minimum: 1, example: 20 },
           startTime: { ...iso, example: "2027-01-10T10:00:00Z" },
           endTime: { ...iso, example: "2027-01-10T12:00:00Z" }
+        }
+      },
+      AuditLogList: {
+        type: "object",
+        properties: {
+          data: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "integer" },
+                eventType: { type: "string", enum: ["reservation.created", "reservation.cancelled"] },
+                payload: { type: "object", additionalProperties: true },
+                createdAt: iso
+              }
+            }
+          },
+          meta: {
+            type: "object",
+            properties: {
+              page: { type: "integer" },
+              limit: { type: "integer" },
+              total: { type: "integer" },
+              totalPages: { type: "integer" }
+            }
+          }
         }
       },
       ReservationList: {
@@ -420,6 +446,23 @@ module.exports = {
           401: E401,
           404: errorResponse("Rezerwacja nie istnieje lub należy do innego użytkownika"),
           409: errorResponse("Rezerwacja już się rozpoczęła (RESERVATION_ALREADY_STARTED)")
+        }
+      }
+    },
+    "/api/admin/audit-log": {
+      get: {
+        tags: ["Admin"],
+        summary: "Dziennik zdarzeń (ADMIN), od najnowszych",
+        parameters: [
+          { name: "eventType", in: "query", schema: { type: "string", enum: ["reservation.created", "reservation.cancelled"] } },
+          { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } },
+          { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 100, default: 20 } }
+        ],
+        responses: {
+          200: ok("Strona wpisów audit logu", ref("AuditLogList")),
+          400: E400,
+          401: E401,
+          403: E403
         }
       }
     }

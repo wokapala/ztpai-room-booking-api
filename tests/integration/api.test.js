@@ -26,7 +26,7 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  await db.raw("TRUNCATE reservations, rooms, buildings, users RESTART IDENTITY CASCADE");
+  await db.raw("TRUNCATE audit_log, reservations, rooms, buildings, users RESTART IDENTITY CASCADE");
   await db("buildings").insert({ name: "Budynek A", address: "ul. Testowa 1" });
   await db("rooms").insert([
     { building_id: 1, name: "101", capacity: 30 },
@@ -62,6 +62,15 @@ describe("Auth", () => {
     const res = await request(app).get("/api/reservations");
     expect(res.status).toBe(401);
     expect(res.body.error.code).toBe("UNAUTHORIZED");
+  });
+});
+
+describe("Admin", () => {
+  test("403 dla USER pobierającego audit log", async () => {
+    const token = await registerAndLogin("jan@example.com");
+    const res = await request(app).get("/api/admin/audit-log").set("Authorization", `Bearer ${token}`);
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe("FORBIDDEN");
   });
 });
 

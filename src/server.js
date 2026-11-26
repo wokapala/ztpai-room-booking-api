@@ -1,5 +1,7 @@
 const config = require("./config");
 const { createApp } = require("./app");
+const { createEventBus } = require("./events/eventBus");
+const { registerAuditListener, registerNotificationListener } = require("./events/listeners");
 
 // composition root - jedyne miejsce, w którym wybieramy implementację repositories
 let unitOfWork;
@@ -15,7 +17,11 @@ if (config.REPOSITORY === "memory") {
   closeDatabase = () => db.destroy();
 }
 
-const app = createApp({ config, runInTransaction: unitOfWork.runInTransaction, now: () => new Date() });
+const eventBus = createEventBus();
+registerAuditListener(eventBus, unitOfWork);
+registerNotificationListener(eventBus, unitOfWork);
+
+const app = createApp({ config, runInTransaction: unitOfWork.runInTransaction, eventBus, now: () => new Date() });
 
 const server = app.listen(config.PORT, () => {
   console.log(`Server running on http://localhost:${config.PORT} (repository: ${config.REPOSITORY})`);

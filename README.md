@@ -72,6 +72,12 @@ npx knex seed:run
 npm start
 ```
 
+## Eventy i audit log
+
+Service rezerwacji publikuje `reservation.created` i `reservation.cancelled` po zatwierdzeniu transakcji.
+Listener zapisuje każdy event w tabeli `audit_log` (payload jako `jsonb`), a drugi listener loguje powiadomienie,
+gdy ADMIN anuluje cudzą rezerwację. Dziennik jest dostępny dla ADMINa pod `GET /api/admin/audit-log?eventType=&page=&limit=`.
+
 ## Konfiguracja
 
 Wszystkie zmienne są opisane w `.env.example` i walidowane przy starcie (`src/config`).
@@ -86,7 +92,8 @@ src/
 ├── db/                   # Knex, migracje, seedy, unit of work
 ├── docs/                 # OpenAPI (Swagger UI)
 ├── errors/, middleware/
-└── modules/              # auth, buildings, rooms, reservations
+├── events/               # event bus + listenery (audit log, powiadomienia)
+└── modules/              # auth, buildings, rooms, reservations, audit
 tests/
 ├── unit/                 # service + repositories in-memory
 └── integration/          # Supertest + PostgreSQL
