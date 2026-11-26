@@ -1,7 +1,7 @@
 const { NotFoundError, ConflictError, ValidationError, ForbiddenError } = require("../../errors/AppError");
 const { noopEventBus } = require("../../events/eventBus");
 
-const MIN_DURATION_MS = 20 * 60 * 1000;
+const MIN_DURATION_MS = 15 * 60 * 1000;
 const MAX_DURATION_MS = 8 * 60 * 60 * 1000;
 
 const ALLOWED_TRANSITIONS = {
